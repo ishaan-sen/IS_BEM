@@ -1,0 +1,102 @@
+#! NX/KF 9.0
+
+DefClass: BEM_Wall (ug_base_part %ug_create_instance);
+
+#====================================================
+# Class for defining a generic wall.
+# defined with a line for the profile, height, and thk
+#====================================================
+
+#===============================
+# class input parameters
+#===============================
+
+(any parameter modifiable) profile: 0;			# lines only
+(number parameter modifiable) height: 2.5;
+(number parameter modifiable) thk: 0.2;
+
+(boolean parameter modifiable) window_present?: false;
+(number parameter modifiable) window_area: 4;		# sq.m.
+(number parameter modifiable) window_aspect: 4 / 3;		# sq.m.
+(number parameter modifiable) window_x_position: 0.5;		# m. from the left end
+
+(number parameter modifiable) window_glass_thk: 0.04;
+
+
+#===============================
+# internal calculated variables
+#===============================
+
+(number modifiable) wall_length: profile:total_arc_length: + thk:;
+
+(number modifiable) window_length: sqrt(window_area: * window_aspect:);
+(number modifiable) window_height: sqrt(window_area: / window_aspect:);
+(number modifiable) window_z_position: (height: - window_height:) / 2;		# m. from the floor
+
+
+#===============================
+# class objects
+#===============================
+
+
+(child) wall_block:
+{
+
+  class,     ug_block;
+  Length,    wall_length:;
+  Width,     thk:;
+  Height,    height:;
+  X_Axis,    unitVector2Points(profile:start_point:, profile:end_point:);
+  Y_Axis,    rotateVector(child:x_axis:, 90, vector(0,0,1));
+  Origin,    profile:start_point: - child:x_axis: * thk: / 2 - child:y_axis: * thk: / 2;
+  Operation, Unite;
+  Target,    {};
+  
+};
+
+
+
+(child) window_opening:
+{
+
+	class, if (window_present?:) then (ug_block) else (nullDesign);
+	length, window_length:;
+	width, thk:;
+	height, window_height:;
+	x_axis, wall_block:x_axis:;
+	y_axis, wall_block:y_axis:;
+	origin, wall_block:origin: + child:x_axis: * window_x_position: + vector(0,0,1) * window_z_position:;
+	operation, subtract;
+	target, {wall_block:};
+
+};
+
+(child) window_center_point:
+{
+	
+	class, if (window_present?:) then (ug_point) else (nullDesign);
+	position, window_opening:origin:
+							+ window_opening:x_axis: * window_opening:length: / 2
+							+ window_opening:y_axis: * window_opening:width: / 2
+							+ vector(0,0,1) * window_opening:height: / 2;
+
+};
+
+
+#+
+(child) window_glass:
+{
+
+	class, if (window_present?:) then (ug_block) else (nullDesign);
+	length, window_length:;
+	width, window_glass_thk:;
+	height, window_height:;
+	x_axis, wall_block:x_axis:;
+	y_axis, wall_block:y_axis:;
+	origin, wall_block:origin: + child:x_axis: * window_x_position: + vector(0,0,1) * window_z_position:;
+	operation, unite;
+	target, {};
+
+};
+#-
+

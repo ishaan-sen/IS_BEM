@@ -1,0 +1,15 @@
+-BEGIN HEADER-
+NASA/POWER CERES/MERRA2 Native Resolution Climatology Climatologies 
+30-year Meteorological and Solar Monthly & Annual Climatologies (January 1990 - December 2019) 
+Location: Latitude  28.0836   Longitude -80.6081 
+Elevation from MERRA-2: Average for 0.5 x 0.625 degree lat/lon region = 7.38 meters
+Value for missing model data cannot be computed or out of model availability range: -999 
+Parameter(s): 
+T2M_MAX                    MERRA-2 Temperature at 2 Meters Maximum (C) 
+ALLSKY_SFC_SW_DNI_MAX      SRB V4/CERES SYN1deg All Sky Surface Shortwave Downward Direct Normal Irradiance Maximum (W/m^2) 
+ALLSKY_SFC_SW_DIFF_MAX     SRB V4/CERES SYN1deg All Sky Surface Shortwave Diffuse Irradiance Maximum (W/m^2) 
+-END HEADER-
+PARAMETER,JAN,FEB,MAR,APR,MAY,JUN,JUL,AUG,SEP,OCT,NOV,DEC,ANN
+T2M_MAX,28.78,29.91,31.69,33.64,36.19,37.05,35.76,35.2,33.83,32.15,30.19,28.37,37.05
+ALLSKY_SFC_SW_DNI_MAX,362.8,401.93,424.54,429.69,394.95,349.58,366.98,341.77,312.27,392.68,360.22,370.95,429.69
+ALLSKY_SFC_SW_DIFF_MAX,101.98,126.46,155.77,166.8,170.93,169.33,169.61,152.9,152.83,122.96,103.97,91.13,170.93

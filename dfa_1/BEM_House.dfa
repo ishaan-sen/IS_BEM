@@ -1,0 +1,590 @@
+#! NX/KF 9.0
+
+DefClass: BEM_House (ug_base_part %ug_create_instance 
+												BEM_House_Dialog_Mixin 
+												BEM_House_GA_Mixin 
+												BEM_House_Physics_Mixin);
+
+#====================================================
+# Class for defining a house using rooms and roofs
+# Units: meters
+#====================================================
+
+
+(string) apply_name: "BEM_House_Object";
+(name) apply_state: edit;
+
+
+#===============================
+# class input parameters
+#===============================
+
+# these declarations are in the mixin class BEM_House_Dialog_Mixin
+
+
+
+
+#===============================
+# internal variables
+#===============================
+
+(point modifiable) origin: point(0,0,0);
+
+(vector modifiable) x_axis: unitize(vector(cos(x_angle:) , sin(x_angle:) , 0));	
+
+(vector modifiable) y_axis: rotateVector(x_axis:, 90, vector(0,0,1));
+
+(frame modifiable) house_frame: frameXY(origin: , x_axis: , y_axis:);
+
+
+
+
+#===============================
+# class objects - rooms in the house
+#===============================
+
+(child) family_room:
+{
+	class, BEM_Room;
+	
+	area, area_family_room:;			
+	aspect_ratio, aspect_family_room:;
+
+	height, height:;
+	wall_thk_list, {0.2, 0.2, 0.2, 0.2};
+
+	origin, origin:;
+	x_axis, x_axis:;
+
+ 	window_wall_inx, window_inx_family_room:; # if ((ref(nth(window_inx_family_room: , child:walls:) , "wall_length:") - guest_bathroom:length:) > (child:window_length:)) 
+ 											# then (window_inx_family_room:) else 0;
+	window_area, window_area_family_room:;
+	window_aspect, window_aspect_family_room:;
+	window_x_position, @{
+												$wall_length << if (mod(window_inx_family_room: , 2) == 0) then (child:width:) else (child:length:);
+												$window_length << sqrt(child:window_area: * child:window_aspect:);
+												guest_bathroom:length: + abs($wall_length - guest_bathroom:length: - $window_length) / 2;
+											};
+
+};
+
+
+
+(child) master_bedroom:
+{
+	class, BEM_Room;
+	
+	area, area_master_bedroom:;			
+	aspect_ratio, aspect_master_bedroom:;
+
+	height, height:;
+	wall_thk_list, {0.2, 0.2, 0.2, 0.2};
+
+	origin, origin: - x_axis: * child:length:;
+	x_axis, x_axis:;
+
+ 	window_wall_inx, window_inx_master_bedroom:; # if (ref(nth(window_inx_master_bedroom: , child:walls:) , "wall_length:") > (child:window_length:)) 
+ 											# then (window_inx_master_bedroom:) else 0;
+	window_area, window_area_master_bedroom:;
+	window_aspect, window_aspect_master_bedroom:;
+	window_x_position, @{
+												$wall_length << if (mod(window_inx_master_bedroom: , 2) == 0) then (child:width:) else (child:length:);
+												$window_length << sqrt(child:window_area: * child:window_aspect:);
+												abs($wall_length - $window_length) / 2;
+											};
+
+};
+
+
+
+(child) master_bathroom:
+{
+	class, BEM_Room;
+	
+	area, area_master_bathroom:;			
+	aspect_ratio, aspect_master_bathroom:;
+
+	height, height:;
+	wall_thk_list, {0.2, 0.2, 0.2, 0.2};
+
+	origin, origin: - x_axis: * child:length: - y_axis: * child:width:;
+	x_axis, x_axis:;
+
+ 	window_wall_inx, window_inx_master_bathroom:; # if (ref(nth(window_inx_master_bathroom: , child:walls:) , "wall_length:") > (child:window_length:)) 
+ 											# then (window_inx_master_bathroom:) else 0;
+	window_area, window_area_master_bathroom:;
+	window_aspect, window_aspect_master_bathroom:;
+	window_x_position, @{
+												$wall_length << if (mod(window_inx_master_bathroom: , 2) == 0) then (child:width:) else (child:length:);
+												$window_length << sqrt(child:window_area: * child:window_aspect:);
+												abs($wall_length - $window_length) / 2;
+											};
+
+};
+
+
+
+(child) living_room:
+{
+	class, BEM_Room;
+	
+	area, area_living_room:;			
+	aspect_ratio, aspect_living_room:;
+
+	height, height:;
+	wall_thk_list, {0.2, 0.2, 0.2, 0.2};
+
+	origin, origin: - y_axis: * child:width:;
+	x_axis, x_axis:;
+
+ 	window_wall_inx, window_inx_living_room:; # if (ref(nth(window_inx_living_room: , child:walls:) , "wall_length:") > (child:window_length:)) 
+ 											# then (window_inx_living_room:) else 0;
+	window_area, window_area_living_room:;
+	window_aspect, window_aspect_living_room:;
+	window_x_position, @{
+												$wall_length << if (mod(window_inx_living_room: , 2) == 0) then (child:width:) else (child:length:);
+												$window_length << sqrt(child:window_area: * child:window_aspect:);
+												abs($wall_length - $window_length) / 2;
+											};
+
+};
+
+
+
+(child) patio:
+{
+	class, BEM_Room;
+	
+	area, area_patio:;			
+	aspect_ratio, aspect_patio:;
+
+	height, height:;
+	wall_thk_list, {0.2, 0.2, 0.2, 0.2};
+
+	origin, origin: + y_axis: * master_bedroom:width: - x_axis: * child:length:;
+	x_axis, x_axis:;
+
+ 	window_wall_inx, window_inx_patio:; # if (ref(nth(window_inx_patio: , child:walls:) , "wall_length:") > (child:window_length:)) 
+ 											# then (window_inx_patio:) else 0;
+	window_area, window_area_patio:;
+	window_aspect, window_aspect_patio:;
+	window_x_position, @{
+												$wall_length << if (mod(window_inx_patio: , 2) == 0) then (child:width:) else (child:length:);
+												$window_length << sqrt(child:window_area: * child:window_aspect:);
+												abs($wall_length - $window_length) / 2;
+											};
+
+};
+
+
+
+(child) guest_bathroom:
+{
+	class, BEM_Room;
+	
+	area, area_guest_bathroom:;			
+	aspect_ratio, aspect_guest_bathroom:;
+
+	height, height:;
+	wall_thk_list, {0.2, 0.2, 0.2, 0.2};
+
+	origin, origin: + x_axis: * (family_room:length: - child:length:) + y_axis: * family_room:width:;
+	x_axis, x_axis:;
+
+ 	window_wall_inx, window_inx_guest_bathroom:; # if (ref(nth(window_inx_guest_bathroom: , child:walls:) , "wall_length:") > (child:window_length:)) 
+ 											# then (window_inx_guest_bathroom:) else 0;
+	window_area, window_area_guest_bathroom:;
+	window_aspect, window_aspect_guest_bathroom:;
+	window_x_position, @{
+												$wall_length << if (mod(window_inx_guest_bathroom: , 2) == 0) then (child:width:) else (child:length:);
+												$window_length << sqrt(child:window_area: * child:window_aspect:);
+												abs($wall_length - $window_length) / 2;
+											};
+
+};
+
+
+
+(child) guest_bedroom:
+{
+	class, BEM_Room;
+	
+	area, area_guest_bedroom:;			
+	aspect_ratio, aspect_guest_bedroom:;
+
+	height, height:;
+	wall_thk_list, {0.2, 0.2, 0.2, 0.2};
+
+	origin, origin: + x_axis: * family_room:length: + y_axis: * (family_room:width: + guest_bathroom:width: - child:width:);
+	x_axis, x_axis:;
+
+ 	window_wall_inx, window_inx_guest_bedroom:; # if (ref(nth(window_inx_guest_bedroom: , child:walls:) , "wall_length:") > (child:window_length:)) 
+ 											# then (window_inx_guest_bedroom:) else 0;
+	window_area, window_area_guest_bedroom:;
+	window_aspect, window_aspect_guest_bedroom:;
+	window_x_position, @{
+												$wall_length << if (mod(window_inx_guest_bedroom: , 2) == 0) then (child:width:) else (child:length:);
+												$window_length << sqrt(child:window_area: * child:window_aspect:);
+												abs($wall_length - $window_length) / 2;
+											};
+
+};
+
+
+
+(child) kids_bathroom:
+{
+	class, BEM_Room;
+	
+	area, area_kids_bathroom:;			
+	aspect_ratio, aspect_kids_bathroom:;
+
+	height, height:;
+	wall_thk_list, {0.2, 0.2, 0.2, 0.2};
+
+	origin, guest_bedroom:origin: - y_axis: * child:width:;
+	x_axis, x_axis:;
+
+ 	window_wall_inx, window_inx_kids_bathroom:; # if (ref(nth(window_inx_kids_bathroom: , child:walls:) , "wall_length:") > (child:window_length:)) 
+ 											# then (window_inx_kids_bathroom:) else 0;
+	window_area, window_area_kids_bathroom:;
+	window_aspect, window_aspect_kids_bathroom:;
+	window_x_position, @{
+												$wall_length << if (mod(window_inx_kids_bathroom: , 2) == 0) then (child:width:) else (child:length:);
+												$window_length << sqrt(child:window_area: * child:window_aspect:);
+												abs($wall_length - $window_length) / 2;
+											};
+
+};
+
+
+
+(child) kids_bedroom:
+{
+	class, BEM_Room;
+	
+	area, area_kids_bedroom:;			
+	aspect_ratio, aspect_kids_bedroom:;
+
+	height, height:;
+	wall_thk_list, {0.2, 0.2, 0.2, 0.2};
+
+	origin, kids_bathroom:origin: - y_axis: * child:width:;
+	x_axis, x_axis:;
+
+ 	window_wall_inx, window_inx_kids_bedroom:; # if (ref(nth(window_inx_kids_bedroom: , child:walls:) , "wall_length:") > (child:window_length:)) 
+ 											# then (window_inx_kids_bedroom:) else 0;
+	window_area, window_area_kids_bedroom:;
+	window_aspect, window_aspect_kids_bedroom:;
+	window_x_position, @{
+												$wall_length << if (mod(window_inx_kids_bedroom: , 2) == 0) then (child:width:) else (child:length:);
+												$window_length << sqrt(child:window_area: * child:window_aspect:);
+												abs($wall_length - $window_length) / 2;
+											};
+
+};
+
+#+#-
+
+#===============================
+# variables and objects for the roof
+#===============================
+
+##+
+
+(list modifiable) rooms: {family_room:, master_bedroom:, master_bathroom:, 
+														living_room:, patio:, guest_bathroom:, guest_bedroom:, 
+														kids_bathroom:, kids_bedroom:};
+														
+												
+												
+(child list) unite_room_solids:
+{
+  class,          ug_boolean; 
+  quantity, 			length(rooms:) - 1;
+  Operation,      Unite;
+  Target,         {family_room:solid_room:};
+  Tool,           {ref(nth(child:index: , rest(rooms:)) , "solid_room:")};
+  Retain_Target?, FALSE;
+  Retain_Tool?,   FALSE;
+  demandOrder,		rooms:;
+};
+
+
+
+(child) body_united_rooms:
+{
+  class,   ug_body; 
+  Feature, {family_room:solid_room:};
+  Density, {};
+  demandOrder, unite_room_solids:;
+};
+
+
+
+(list modifiable) roof_edges:
+@{
+	
+	body_united_rooms:;
+	
+	$all_faces << ug_body_askFaces(body_united_rooms:);
+	
+	$top_face << loop
+	{
+		for $face in $all_faces;
+		if (ug_face_askNormal($face, {0,0}) == vector(0,0,1)) return $face;
+	};
+	
+	ug_face_askEdges($top_face);
+};
+
+
+
+(list modifiable) bounding_box:
+@{
+
+	roof_edges:;
+	
+	$edge_vert_XY << loop
+	{
+		
+		for $edge in roof_edges:;
+		
+		for $stP is ug_curve_askStartPoint($edge);
+		for $enP is ug_curve_askEndPoint($edge);
+		
+		collect localXY_($stP , house_frame: , "x") into $x_st_List;
+		collect localXY_($stP , house_frame: , "y") into $y_st_List;
+		collect localXY_($enP , house_frame: , "x") into $x_en_List;
+		collect localXY_($enP , house_frame: , "y") into $y_en_List;
+		
+		return is {removeDuplicates(flatten({$x_st_List , $x_en_List})) , removeDuplicates(flatten({$y_st_List , $y_en_List}))};
+		
+	};
+	
+	$x_min << minList(first($edge_vert_XY));
+	$y_min << minList(second($edge_vert_XY));
+	$x_max << maxList(first($edge_vert_XY));
+	$y_max << maxList(second($edge_vert_XY));
+	
+	$bBox_vertices << {
+												point_($x_min , $y_min , height: , house_frame:),
+												point_($x_max , $y_min , height: , house_frame:),
+												point_($x_max , $y_max , height: , house_frame:),
+												point_($x_min , $y_max , height: , house_frame:),
+												point_($x_min , $y_min , height: , house_frame:)	# first one repeated, for looping of line start-end
+										};
+	
+	firstN($bBox_vertices , 4);  
+
+};
+
+
+
+(list modifiable) spine_points_x:	
+{
+		first(bounding_box:) + y_axis: * dist(first(bounding_box:) , fourth(bounding_box:)) / 2 + vector(0,0,1) * roof_height: ,
+		second(bounding_box:) + y_axis: * dist(first(bounding_box:) , fourth(bounding_box:)) / 2 + vector(0,0,1) * roof_height:
+};
+
+
+
+(boolean modifiable) flag_spine: false;
+
+
+
+(child) spine_x: 
+{
+
+	class, if (flag_spine: == true) then ug_line else nullDesign;
+	start_point, first(spine_points_x:);
+	end_point, second(spine_points_x:);
+	suppress?, true;
+};
+
+
+
+(list modifiable) roof_slopes_data:
+@{
+
+	storeValue(2 , body_united_rooms: , layer);
+
+	$roof_edges_along_x << loop
+	{
+
+		for $edge in roof_edges:;
+
+		for $stP is ug_curve_askStartPoint($edge);
+		for $enP is ug_curve_askEndPoint($edge);
+
+		for $edge_vec is unitVector2Points($stP , $enP);
+
+		if ( ($edge_vec == x_axis:) || ($edge_vec == - X_Axis:)) collect $edge;	
+
+	};
+
+	
+	$roof_slopes_data << loop
+	{
+	
+		for $edge in $roof_edges_along_x ;
+		
+		for $stP is ug_curve_askStartPoint($edge);
+		
+		for $stP_x_ is localXY_($stP , house_frame: , "x");
+		
+		for $spineP_x_ is $stP_x_;
+		for $spineP_y_ is localXY_(spine_x:start_point: , house_frame: , "y");
+		for $spineP_z_ is localZ(spine_x:start_point:);
+		
+		for $spineP is point_($spineP_x_ , $spineP_y_ , $spineP_z_ , house_frame:);
+		
+		for $slope_vec is unitVector2Points($stP , $spineP);
+		
+		for $slope_length is dist($stP , $spineP);
+		
+		collect {$edge , $slope_length , $slope_vec};
+	};
+
+};
+
+
+
+(boolean modifiable) flag_roof: false;
+
+
+
+(child list) roof_slopes:
+{
+
+	class, if (flag_roof: == true) then ug_extruded else nullDesign;
+	quantity, if (flag_roof: == true) then length(roof_slopes_data:) else 0;
+	profile, {first(nth(child:index: , roof_slopes_data:))};
+	# start_limit, -0.5;
+	end_limit, second(nth(child:index: , roof_slopes_data:));
+	direction, third(nth(child:index: , roof_slopes_data:));
+	layer, 2;
+
+};
+
+
+
+
+#===============================
+# variables and objects for the gables
+#===============================
+
+
+
+(list modifiable) gable_triangles:
+@{
+
+	$roof_edges_along_y << loop
+	{
+
+		for $edge in roof_edges:;
+
+		for $stP is ug_curve_askStartPoint($edge);
+		for $enP is ug_curve_askEndPoint($edge);
+
+		for $edge_vec is unitVector2Points($stP , $enP);
+
+		if ( ($edge_vec == y_axis:) || ($edge_vec == - y_axis:)) collect $edge;	
+
+	};
+	
+	
+	$roof_slope_side_edges << loop
+	{
+		
+		for $slope in roof_slopes:;
+		for $slope_edges is ug_body_askedges($slope);
+		
+		for $edges_not_along_x is loop
+		{
+		
+			for $edge in $slope_edges;
+			for $stP is ug_curve_askStartPoint($edge);
+			for $enP is ug_curve_askEndPoint($edge);
+			for $edge_vec is unitVector2Points($stP , $enP);
+			if ( ($edge_vec != x_axis:) && ($edge_vec != -x_axis:)) collect $edge;
+		
+		};
+		
+		append $edges_not_along_x;
+	
+	};
+	
+	
+	$triangular_profiles << loop
+	{
+	
+		for $roof_edge in $roof_edges_along_y;
+		
+		for $intersecting_slope_edges is loop
+		{
+		
+			for $slope_edge in $roof_slope_side_edges;
+			if (first(ug_askMinimumDistance($roof_edge , $slope_edge)) == 0) collect $slope_edge;
+		
+		};
+		
+		collect flatten({$roof_edge , $intersecting_slope_edges});
+	
+	};
+	
+};
+
+
+
+(child list) gables:
+{
+
+	class, if (flag_roof: == true) then ug_extruded else nullDesign;
+	quantity, if (flag_roof: == true) then length(gable_triangles:) else 0;
+	profile, nth(child:index: , gable_triangles:);
+	start_limit, -0.1;
+	end_limit, 0.1;
+	direction, x_axis:;
+	layer, 2;
+
+};
+
+
+
+
+(child) house_id:
+{
+
+	class, ug_note;
+	text, {format("%d" , gen_id:) + "." + format("%d" , child_id:)};
+	x_axis, vector(1,0,0);
+	y_axis, vector(0,1,0);
+	origin, origin: + (height: + roof_height: + 1) * vector(0,0,1);
+	color, ug_askClosestColor(red);
+	layer, 2;
+
+};
+#+#-
+
+
+
+#+
+(child) land:
+{
+
+  class,     ug_block;
+  Length,    dist(first(bounding_box:) , second(bounding_box:)) + 10;
+  Width,     dist(second(bounding_box:) , third(bounding_box:)) + 10;
+  Height,    0.01;
+  X_Axis,    unitVector2Points(first(bounding_box:) , second(bounding_box:));
+  Y_Axis,    unitVector2Points(second(bounding_box:) , third(bounding_box:));
+  Origin,    first(bounding_box:) + vector(0,0,-1) * (height: + 0.01) - child:x_axis: * 5 - child:y_axis: * 5;
+  Operation, Unite;
+  Target,    {};
+
+};
+#-
+
+
+

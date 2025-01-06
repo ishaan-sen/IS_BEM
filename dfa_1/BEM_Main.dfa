@@ -1,0 +1,14 @@
+#! NX/KF 9.0
+
+DefClass: BEM_Main (ug_base_part %ug_create_instance);
+
+
+(string) apply_name: "ScienceFair2021BEM";
+(name) apply_state: edit;
+
+
+
+(child) BEM_House_1:
+{
+	class, BEM_House;
+};

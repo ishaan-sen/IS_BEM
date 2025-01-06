@@ -1,0 +1,436 @@
+#! NX/KF 9.0
+
+DefClass: BEM_House_Physics_Mixin (ug_base_part %ug_create_instance);
+
+#====================================================
+# Class for modeling the physics of the heat load to the house.
+# This is an abstract class and cannot be instantiated directly.
+# It can only be used as a mixin to the BEM_House class.
+#====================================================
+
+#====================================================
+# internal calculated variables
+#====================================================
+
+(string modifiable) city_name: nth(city: , city_LIST:);	
+
+(number modifiable) latitude: 
+@{
+
+	$split << splitString(city_name:, "()");	
+	makeNumber(last($split));
+
+};
+
+(number modifiable) sun_angle_with_vert: if (solstice: == 1) then (latitude: - 23.5) else (latitude: + 23.5);
+
+(vector modifiable) sun_vec: rotateVector(vector(0,0,-1) , sun_angle_with_vert: , vector(1,0,0));
+
+
+(child) sunray_object:
+{
+
+	class, ug_line;
+	start_point, origin: - sun_vec: * 20;
+	end_point, origin:;
+
+};
+
+
+
+(boolean method modifiable) get_city_data:()
+@{
+
+	$port << ug_excel_open_file(city_data_FILE:, read);
+	
+	if ($port == 0) then (ug_printMessage({"Failed to open the City Data Excel file with read access."})) 
+		
+		else @{
+		
+						$columnB_data << ug_excel_read_range($port , 1 , 1 , 2 , 200 , 2);
+						
+						$city_row << loop{
+																for $i from 6 to length($columnB_data);	
+																if (nth($i , $columnB_data) == city_name:) return ($i - 5);
+																return is @{
+																							ug_printMessage({"Could not find city in the database."});
+																							1;
+																					};
+															};
+															
+						$city_data_june << ug_excel_read_range($port , 1 , $city_row + 2 , 8 , $city_row + 4 , 8);
+						$city_data_december << ug_excel_read_range($port , 1 , $city_row + 2 , 14 , $city_row + 4 , 14);
+						
+						$city_data << if (solstice: == 1) then ($city_data_june) else ($city_data_december);
+						
+						$city_data_formatted << loop
+						{
+							for $i from 6 to length($city_data);
+							collect makeNumber(nth($i , $city_data));	
+						};
+						
+						storeValue($city_data_formatted , self: , city_data);
+						
+					};
+			
+	ug_excel_close_file($port, true);
+	
+	ug_printValues({city_name: + ", " + nth(solstice: , solstice_LIST:) + ":~nTemp = " + format("%d" , first(city_data:)) + " K, DNI = " + format("%d" , second(city_data:)) + " W/m^2, DIF = " + format("%d" , third(city_data:)) + " W/m^2."});
+	
+	true;
+
+};
+
+
+
+(list modifiable) city_data: {};
+
+(number modifiable) T_amb: first(city_data:) + 273;		# K
+(number modifiable) DNI: second(city_data:);					# G_solar, W/m^2
+(number modifiable) DIF: third(city_data:);						# G_sky, W/m^2
+(number modifiable) wind_speed: 1.0;									# m/s		# should come from NASA's city data
+
+(number modifiable) h_coeff: 12.12 - 1.16 * wind_speed: + 11.6 * wind_speed: ^ 0.5;		# cite...
+
+
+
+
+##+
+(list modifiable) face_data_windows:
+@{
+
+	$all_faces << ug_body_askFaces(body_united_rooms:);
+	
+	$wall_faces << loop
+	{
+		for $face in $all_faces;
+		for $face_normal is ug_face_askNormal($face, {0,0});
+		if (($face_normal != vector(0,0,1)) && ($face_normal != vector(0,0,-1))) collect $face;
+	};
+	
+	loop
+	{
+	
+		for $room in rooms:;
+		
+		for $windex is ref($room, "window_wall_inx:");
+		
+		for $window_data is if ($windex != 0) then 
+		@{
+		
+			$window_area << (ref($room, "window_area:"));
+			
+			$window_center_pt << ref(nth($windex , ref($room , "walls:")) , "window_center_point:");
+			
+			$win_2_face_dists << loop
+			{
+				for $face in $wall_faces;
+
+				collect first(ug_askMinimumDistance($face , $window_center_pt));
+			};
+			
+			# ug_printValues({"~n" , $win_2_face_dists});
+			
+			$wall_of_window << nth(position(minList($win_2_face_dists) , $win_2_face_dists) , $wall_faces);
+			
+			$window_normal << (ug_face_askNormal($wall_of_window, {0,0}));
+			
+			{$wall_of_window , $window_area , $window_normal};
+		
+		}
+		else {};
+		
+		if ($windex != 0) collect $window_data;
+	
+	};
+
+};
+#-
+
+
+(list modifiable) face_data_walls:
+@{
+	
+	$all_faces << ug_body_askFaces(body_united_rooms:);
+	
+	$wall_faces << loop
+	{
+		for $face in $all_faces;
+		for $face_normal is ug_face_askNormal($face, {0,0});
+		if (($face_normal != vector(0,0,1)) && ($face_normal != vector(0,0,-1))) collect $face;
+	};
+
+	loop
+	{
+		for $wall_face in $wall_faces;
+		
+		for $wall_area is ug_face_askArea($wall_face);
+		
+		for $wall_normal is ug_face_askNormal($wall_face, {0,0});
+
+		for $wall_area_adjusted is loop
+		{
+			for $i from 1 to length(face_data_windows:);
+
+			for $wall_of_window is first(nth($i , face_data_windows:));
+			
+			if ($wall_face == $wall_of_window) 
+					return {$wall_face , ($wall_area - second(nth($i , face_data_windows:))) , $wall_normal}; 
+			
+			return is {$wall_face , $wall_area , $wall_normal};
+
+		};
+		
+		collect $wall_area_adjusted;
+	};
+
+};
+
+
+
+
+(list modifiable) face_data_roofs: loop
+{
+
+	for $slope in roof_slopes:;
+	
+	for $face is first(ug_body_askFaces($slope));
+	
+	for $face_normal is ug_face_askNormal($face, {0,0});
+	
+	for $face_area is ug_face_askArea($face);
+	
+	collect {$face , $face_area , -$face_normal};	# all face normals came out pointing inward into the house, so using the (-)
+
+};
+
+
+
+
+(list modifiable) face_data_gables:	loop
+{
+
+	for $i from 1 to length(gables:);
+
+	for $gable is nth($i , gables:);
+	
+	for $gable_roof_edge is first(nth($i , gable_triangles:));
+
+	for $green_faces_touching_gable is ug_edge_askFaces($gable_roof_edge);
+
+	for $green_wall_face_touching_gable is loop
+	{
+		for $green_face in $green_faces_touching_gable;
+		
+		if (localZ(ug_face_askNormal($green_face, {0,0})) == 0) return ($green_face);
+	};
+
+	for $green_wall_face_normal is ug_face_askNormal($green_wall_face_touching_gable, {0,0});
+
+	for $gable_faces is ug_body_askFaces($gable);
+
+	for $gable_outer_face_data is loop
+	{
+		for $gable_face in $gable_faces;
+		
+		for $gable_face_normal is ug_face_askNormal($gable_face, {0,0});
+
+		if ( $gable_face_normal == $green_wall_face_normal ) 
+			return {$gable_face , ug_face_askArea($gable_face) , $gable_face_normal};
+	};
+
+	collect $gable_outer_face_data;
+
+};
+
+
+
+(string parameter modifiable) heat_balance_calculator_FILE: getEnv("BEM_BASE_DIR") + "\Application\Heat_Balance.xlsm";
+
+
+
+(number method modifiable) get_heat_load:(list $face_data_list , number $alpha_s , number $alpha_sky , number $tau_s , number $tau_sky , number $h , number $kappa , number $T_i , number $L)
+@{
+
+	$G_solar_data << loop
+	{
+	
+		for $face_data in $face_data_list;
+		
+		for $face is first($face_data);
+		for $face_area is second($face_data);
+		for $face_vec is third($face_data);
+		
+		for $theta is angle2Vectors($face_vec , -sun_vec: , $face_vec * (-sun_vec:));
+		
+		for $face_area_normal_2_sun is $face_area * cos($theta);
+		
+		for $G_solar is if ($theta < 90) then (DNI: * $face_area_normal_2_sun) else (0);	# Watts
+		
+		collect {$face , $theta , $G_solar};
+	
+	};
+	
+	
+	$G_sky_data << loop
+	{
+	
+		for $face_data in $face_data_list;
+		
+		for $face is first($face_data);
+		for $face_area is second($face_data);
+		for $face_vec is third($face_data);
+		
+		for $beta is angle2Vectors($face_vec , vector(0,0,1) , $face_vec * vector(0,0,1));
+		
+		for $visible_sky_angle is (180 - $beta);
+		for $total_sky_angle is 180;
+		
+		for $G_sky is ($visible_sky_angle / $total_sky_angle) * DIF: * $face_area;		# Watts
+		
+		collect {$face , $visible_sky_angle , $G_sky};
+	
+	};
+	
+	
+	
+	$port2 << ug_excel_open_file(heat_balance_calculator_FILE:, write);
+	
+	$total_heat_load << if ($port2 == 0) then (ug_printMessage({"Failed to open the Heat Load Calculator file with write access."}))
+		else loop
+		{
+
+			for $face_data in $face_data_list;
+			for $solar_data in $G_solar_data;			# not nested
+			for $sky_data in $G_sky_data;					# not nested
+
+			for $face_area is second($face_data);
+			for $G_solar is third($solar_data);
+			for $G_sky is third($sky_data);
+
+			do ug_excel_write_range($port2, {1, 5, 3, 16, 3, $face_area , $G_solar , $alpha_s , $tau_s , $G_sky , $alpha_sky , $tau_sky , $h , T_amb: , $kappa , $T_i , $L});
+
+			for $heat_load is makeNumber(sixth(ug_excel_read_range($port2, 1, 33, 3, 33, 3)));
+
+			sum $heat_load;
+			
+		};
+	
+	
+	ug_excel_close_file($port2, true);
+	
+	round($total_heat_load);
+	
+};
+
+
+
+(number modifiable) heat_load_windows: 0;				
+(number modifiable) heat_load_walls: 0;				
+(number modifiable) heat_load_gables: 0;					
+(number modifiable) heat_load_roofs: 0;						
+(number modifiable) heat_load_total: 0;
+
+
+(boolean method modifiable) get_heat_load_total:(integer $gen_index , integer $child_index)
+@{
+
+	body_united_rooms:;
+	ug_updateKFObjects({});
+	
+	#	ug_printMessage({"Now evaluating faces."});
+
+	face_data_windows:;
+	face_data_walls:;
+	face_data_gables:;
+	face_data_roofs:;
+	
+	# ug_printValues({"~nNumber of faces (walls, gables, roofs) = " , length(face_data_walls:) , ", ", length(face_data_gables:) , ", ", length(face_data_roofs:)});
+	
+	#+
+	ug_printValues({"~n" , face_data_windows:});
+	ug_printValues({"~n" , face_data_walls:});
+	ug_printValues({"~n" , face_data_gables:});
+	ug_printValues({"~n" , face_data_roofs:});  
+	#-
+	
+	# ug_printMessage({"Now evaluating windows."});
+	
+	$heat_load_windows << if (length(face_data_windows:) > 0) then get_heat_load:(face_data_windows: , alpha_s_window: , alpha_sky_window: , 		
+																																										tau_s_window: , tau_sky_window: , h_coeff: , kappa_window: , 			
+																																										T_i: , L_window:)
+																														else 0; #+#-
+	
+	# ug_printValues({"Now evaluating walls."});
+																											
+	$heat_load_walls << get_heat_load:(face_data_walls: , alpha_s_wall_gable: , alpha_sky_wall_gable: , 
+																										tau_s_wall_gable: , tau_sky_wall_gable: , h_coeff: , kappa_wall_gable: ,  
+																										T_i: , L_wall_gable:);
+	
+	# ug_printValues({"Now evaluating gables."});
+																										
+	$heat_load_gables << get_heat_load:(face_data_gables: , alpha_s_wall_gable: , alpha_sky_wall_gable: , 
+																											tau_s_wall_gable: , tau_sky_wall_gable: , h_coeff: , kappa_wall_gable: ,  
+																											T_i: , L_wall_gable:);
+	
+	# ug_printValues({"Now evaluating roofs."});
+																											
+	$heat_load_roofs << get_heat_load:(face_data_roofs: , alpha_s_roof: , alpha_sky_roof: , 
+																											tau_s_roof: , tau_sky_roof: , h_coeff: , kappa_roof: , 
+																											T_i: , L_roof:);
+	
+	# ug_printValues({"Now evaluating the total heat load."});
+	
+	$heat_load_total << $heat_load_windows + $heat_load_walls + $heat_load_gables + $heat_load_roofs;	
+	
+	# ug_printValues({"Now writing values to variables."});
+	
+	storeValue($heat_load_windows , self: , heat_load_windows);
+	storeValue($heat_load_walls , self: , heat_load_walls);
+	storeValue($heat_load_gables , self: , heat_load_gables);
+	storeValue($heat_load_roofs , self: , heat_load_roofs);
+	storeValue($heat_load_total , self: , heat_load_total);
+	
+	ug_printValues({"~nChild " + format("%d" , $gen_index) + "." + format("%d" , $child_index) + 
+										" heat load (Windows + Walls + Gables + Roofs) = " + format("%d" , heat_load_windows:) + 
+										" + " + format("%d" , heat_load_walls:) + " + " + format("%d" , heat_load_gables:) + 
+										" + " + format("%d" , heat_load_roofs:) + " = " + format("%d" , heat_load_total:) + 
+										" Watts."});
+	
+	true;
+
+};
+
+
+
+
+(number modifiable) alpha_s_window: 0.1;
+(number modifiable) alpha_s_wall_gable: 0.3;
+(number modifiable) alpha_s_roof: 0.5;
+
+(number modifiable) alpha_sky_window: 0.1;
+(number modifiable) alpha_sky_wall_gable: 0.3;
+(number modifiable) alpha_sky_roof: 0.5;
+
+(number modifiable) tau_s_window: 0.8;
+(number modifiable) tau_s_wall_gable: 0;
+(number modifiable) tau_s_roof: 0;
+
+(number modifiable) tau_sky_window: 0.8;
+(number modifiable) tau_sky_wall_gable: 0;
+(number modifiable) tau_sky_roof: 0;
+
+(number modifiable) kappa_window: 0.96;
+(number modifiable) kappa_wall_gable: 0.3;
+(number modifiable) kappa_roof: 0.06;
+
+(number modifiable) L_window: 0.005;
+(number modifiable) L_wall_gable: 0.25;
+(number modifiable) L_roof: 0.2;
+
+
+
+
+
+
+

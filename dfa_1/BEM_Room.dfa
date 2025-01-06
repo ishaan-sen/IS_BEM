@@ -1,0 +1,108 @@
+#! NX/KF 9.0
+
+DefClass: BEM_Room (ug_base_part %ug_create_instance);
+
+#====================================================
+# Class for defining a generic room with four walls,
+# floor, ceiling, and some windows
+# Units: meters
+#====================================================
+
+#===============================
+# class input parameters
+#===============================
+
+(number parameter modifiable) area: 6;						# sq-m
+(number parameter modifiable) aspect_ratio: 1;		# length / width
+
+(number parameter modifiable) height: 2.5;
+(list parameter modifiable) wall_thk_list: {0.2, 0.2, 0.1, 0.1};
+
+(point parameter modifiable) origin: point(0,0,0);
+(vector parameter modifiable) x_axis: vector(1,0,0);
+
+# a room can have only one window, in any of the four walls
+(integer parameter modifiable) window_wall_inx: 1;
+(number parameter modifiable) window_area: 3.2;
+(number parameter modifiable) window_aspect: 1;
+(number parameter modifiable) window_x_position: 0.2;
+
+
+
+#===============================
+# internal variables
+#===============================
+
+(vector modifiable) y_axis: rotateVector(x_axis:, 90, vector(0,0,1));
+(number modifiable) length: sqrt(area: * aspect_ratio:);
+(number modifiable) width: sqrt(area: / aspect_ratio:);
+(number modifiable) window_length: sqrt(window_area: * window_aspect:);
+
+
+#===============================
+# class objects
+#===============================
+
+(child list) wall_profiles:
+{
+	class, ug_line;
+	quantity, 4;
+	
+	start_point, if (child:index: == 1) then origin:
+								else if (child:index: == 2) then origin: + x_axis: * length:
+								else if (child:index: == 3) then origin: + x_axis: * length: + y_axis: * width:
+								else origin: + y_axis: * width:;
+	
+	end_point, if (child:index: == 4) then origin:
+								else if (child:index: == 1) then origin: + x_axis: * length:
+								else if (child:index: == 2) then origin: + x_axis: * length: + y_axis: * width:
+								else origin: + y_axis: * width:;
+	
+};
+
+
+
+(child list) walls:
+{
+	class, BEM_wall;
+	quantity, length(wall_profiles:);
+	
+	profile, nth(child:index:, wall_profiles:);
+	height, height:;
+	thk, nth(child:index:, wall_thk_list:);
+	
+	window_present?, if (child:index: == window_wall_inx:) then true else false;
+	window_area, window_area:;
+	window_aspect, window_aspect:;
+	window_x_position, window_x_position:;
+	
+};
+
+
+
+(child) floor:
+{
+	class, ug_block;
+	length, length:;
+	width, width:;
+	height, 0.1;	# hard coded, for visual pleasure only
+	origin, origin:;
+	x_axis, x_axis:; 
+	y_axis, y_axis:;
+	
+};
+
+
+
+(child) solid_room:
+{
+	class, ug_block;
+	length, length:;
+	width, width:;
+	height, height:;	
+	origin, origin:;
+	x_axis, x_axis:; 
+	y_axis, y_axis:;
+};
+
+

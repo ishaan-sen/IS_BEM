@@ -1,0 +1,490 @@
+#! NX/KF 9.0
+
+DefClass: SenGenericFunctions (ug_base_part %ug_create_instance);
+
+
+#==============================================================================
+# Function		unitVector2Points
+#==============================================================================
+
+Defun: unitVector2Points(point $p1; point $p2)
+@{
+	$delx << localx($p2)-localx($p1);
+	$dely << localy($p2)-localy($p1);
+	$delz << localz($p2)-localz($p1);
+	$output << unitize(vector($delx, $dely, $delz));
+} vector;
+
+#==============================================================================
+# Function		rotateFrame
+#==============================================================================
+
+defun: rotateFrame(point $origin, vector $xVec, vector $yVec, number $ang, vector $axisOfRotation)
+@{
+	$xVecNew << rotateVector($xVec, $ang, $axisOfRotation);
+	$yVecNew << rotateVector($yVec, $ang, $axisOfRotation);
+	frameXY($origin, $xVecNew, $yVecNew);
+} frame;
+
+
+
+#==============================================================================
+# Function		rotateVectorIn3D
+#==============================================================================
+
+defun: rotateVectorIn3D(vector $vecInput, number $angRotateX, number $angRotateY, number $angRotateZ)
+@{
+	$vecAfterRotateX << rotateVector($vecInput, $angRotateX, vector(1,0,0));
+	$vecAfterRotateY << rotateVector($vecAfterRotateX, $angRotateY, vector(0,1,0));
+	$vecAfterRotateZ << rotateVector($vecAfterRotateY, $angRotateZ, vector(0,0,1));
+	
+	# Since the three rotations are orthogonal and independent of each other,
+	# the order in which the axes of rotation are picked does not matter.
+} vector;
+
+
+#==============================================================================
+# Function		rotateCSYS
+#==============================================================================
+
+defun: rotateCSYS(any $csys, number $ang, vector $axisOfRotation)
+@{
+	$xVec << ref($csys, "x_axis:");
+	$yVec << ref($csys, "y_axis:");
+	
+	$xVecNew << rotateVector($xVec, $ang, $axisOfRotation);
+	$yVecNew << rotateVector($yVec, $ang, $axisOfRotation);
+	frameXY(ref($csys, "origin:"), $xVecNew, $yVecNew);
+} frame;
+
+
+
+#==============================================================================
+# Function		interpolatePoints
+#==============================================================================
+
+defun: interpolatePoints(point $p1, point $p2, number $ratio)
+@{
+	$x1 << localX($p1);
+	$y1 << localY($p1);
+	$z1 << localZ($p1);
+
+	$x2 << localX($p2);
+	$y2 << localY($p2);
+	$z2 << localZ($p2);
+	
+	$newX << $x1 + $ratio * ($x2 - $x1);
+	$newY << $y1 + $ratio * ($y2 - $y1);
+	$newZ << $z1 + $ratio * ($z2 - $z1);
+	
+	point($newX, $newY, $newZ);
+
+} point;
+
+
+
+#==============================================================================
+# Function		writeToFile
+#==============================================================================
+
+Defun: WriteToFile(STRING $path ; LIST $listOfStrings ; name ($openType; WRITE))
+@{
+  $file << openFile($path ; $openType) ;
+
+  $writeOutLines << loop 
+  {
+    for $line in $listOfStrings ;
+    for $i from 1 ;
+    for $adder is if $i = length($listOfStrings) then "" else "~x0d~n"; 
+    do if $line = "" then 0 else write($line + $adder ; $file) ;
+    return is 1 ;
+  } ;
+
+  $closeTheFile << closeFile($file) ;
+} integer ;
+
+
+
+
+#==============================================================================
+# Function		fourth, fifth, ..., tenth
+#==============================================================================
+
+Defun: fourth(list $list)
+@{
+	nth(4, $list);
+} any;
+
+Defun: fifth(list $list)
+@{
+	nth(5, $list);
+} any;
+
+Defun: sixth(list $list)
+@{
+	nth(6, $list);
+} any;
+
+Defun: seventh(list $list)
+@{
+	nth(7, $list);
+} any;
+
+Defun: eighth(list $list)
+@{
+	nth(8, $list);
+} any;
+
+Defun: ninth(list $list)
+@{
+	nth(9, $list);
+} any;
+
+Defun: tenth(list $list)
+@{
+	nth(10, $list);
+} any;
+
+#==============================================================================
+# Function		removeLast
+#==============================================================================
+
+defun: removeLast(list $list)
+@{
+	reverse(rest(reverse($list)));
+} list;
+
+#==============================================================================
+# Function		lastN
+#==============================================================================
+
+defun: lastN(list $list, integer $n)
+@{
+	reverse(firstN(reverse($list), $n));
+} list;
+
+#==============================================================================
+# Function		lastNofString
+#==============================================================================
+
+defun: lastNofString(string $str, integer $n)
+@{
+	$stringLength << length(splitString($str, ""));
+	
+	$output << if ($stringLength <= $n) 
+				then ($str) 
+				else (substring($str, ($stringLength - $n + 1), $stringLength));
+} string;
+
+#==============================================================================
+# Function		appendToList
+#==============================================================================
+
+defun: appendToList(any $member, list $list)
+@{
+	flatten($list, $member);
+} list;
+
+
+#==============================================================================
+# Function		allChildrenInModel
+#==============================================================================
+
+defun: allChildrenOfObject(instance $obj)
+@{
+	$gen1 << ref($obj, "children:");
+	
+	$gen2 << loop
+	{
+		for $child in $gen1;
+		for $gen is allChildrenOfObject($child);
+		collect $gen;
+	};
+	
+	removeDuplicates(flatten({$gen1, $gen2}));
+} list;
+
+
+
+
+#==============================================================================
+# Function		eraseExcelData
+#==============================================================================
+
+Defun: eraseExcelSheetData(string $xlsFilePath, list $sheetIDList)
+@{
+	$xls << ug_excel_open_file($xlsFilePath, write);
+
+	loop
+	{
+		for $sheetID in $sheetIDList;
+		for $usedRange is ug_excel_get_range_of_used_cells($xls, $sheetID);
+		do storeValue($usedRange, self:, excelRangeToBeDeleted);
+		for $rangeRows is third($usedRange) - first($usedRange) + 1;
+		for $rangeCols is fourth($usedRange) - second($usedRange) + 1;
+
+		for $listOfNullStrings is loop
+		{
+			for $i from 1 to ($rangeRows * $rangeCols);
+			collect "";
+		};
+
+		do ug_excel_write_range($xls, {$sheetID} + $usedRange + $listOfNullStrings);
+	};
+	
+	ug_excel_close_file($xls, true);
+} boolean;
+
+
+
+
+#==============================================================================
+# Function		isExcelFileWritable?
+#==============================================================================
+
+Defun: isExcelFileWritable?(string $xlsFilePath)
+@{
+	$xls << ug_excel_open_file($xlsFilePath, write);
+	$data << ug_excel_read_range($xls, 1, 1, 1, 1, 1);
+	ug_excel_write_range($xls, {1} + {1, 1, 1, 1} + $data);
+	$close << ug_excel_close_file($xls, true);
+	
+	if ($close == false) 
+		then @{
+				ug_printMessage({	"The Excel file located at: ~n",
+									$xlsFilePath, 
+									"~ncould not be opened with write access.",
+									"If the file is already open, close it and try again."
+								});
+				0;
+			  } 
+		else 1;
+		
+} integer;
+
+
+#==============================================================================
+# Function		allDataInDBRecordset
+#==============================================================================
+
+defun: allDataInDBRecordset(any $recordSet)
+@{
+    if (ref($recordSet, "isEmpty?:") == true) 
+    	
+    	then @{
+    				ug_printMessage({"Found empty recordset in: ",
+    									ref($recordSet, "givenName:"),
+    									"Aborting operation..."
+    								});
+    				{"Found empty recordset in: ", ref($recordSet, "givenName:")};
+    			} 
+    	
+    	else @{
+					$numRows << @{
+									refMethod($recordSet, "movefirst:", {});		# must start counting from top
+									refMethod($recordSet, "getRecordCount:", {});	# This puts control at the end of the recordset
+								};
+
+					refMethod($recordSet, "movefirst:", {});						# must return control to the top again
+								
+					$rows << loop
+					{
+						for $rowID from 1 to $numRows; 
+						for $rowData is if ($rowID == 1) 
+											then refMethod($recordSet, "getrecord:", {}) 
+											else @{
+														refMethod($recordSet, "moveNext:", {});
+														refMethod($recordSet, "getrecord:", {});
+													};
+						collect $rowData;
+					};
+    			};
+} list;
+
+
+
+#==============================================================================
+# Function		infinity
+#==============================================================================
+
+defun: infinity()
+@{
+	1000000000000.0;
+} number;
+
+#==============================================================================
+# Function		shortenFilePathString
+#==============================================================================
+
+defun: shortenFilePathString(string $pathString, integer $lengthLimit)
+@{
+	$stringLength << length(splitString($pathString, ""));
+	$outputString << if ($stringLength <= $lengthLimit) 
+						then ($pathString) 
+						else (first(splitString($pathString, "\")) + "\...\" + last(splitString($pathString, "\")));
+} string;
+
+#==============================================================================
+# Function		cs_face_askGradientData
+#==============================================================================
+
+defun: cs_face_askGradientData(any $face, list $pointParams)
+@{
+	# find u and v parameters of the point passed
+	$u << first($pointParams);
+	$v << second($pointParams);
+	
+	# find the local normal vector to the face at the given point denoted by {u, v}
+	$normal << ug_face_askNormal($face, {$u, $v});
+	
+	# find the vertical vector, SAME FOR BOTH up-facing or down-facing face
+	$vertical << vector(0,0,1);
+
+	# the plane containing these two vectors also contains the gradient vector,
+	# since this plane is (1) vertical, (2) through the point (u,v), and (3) normal to the face.
+	# find the direction vector of this plane using a cross product.
+	$verticalPlaneDirection << $vertical * $normal;
+	
+	# the gradient vector is the cross product of the normal vector and this previous vector.
+	$gradient << $normal * $verticalPlaneDirection;
+	
+	{$normal, $vertical, $verticalPlaneDirection, $gradient};
+} list;
+
+#==============================================================================
+# Function		cs_convexHull_xyPoints
+# Finds the convex hull of a list of points on the XY plane 
+# and returns the list of points on the hull, in order, including the 
+# last point which is the first point of the hull polygon.
+# It also creates the hull geometry as temporary instances.
+#==============================================================================
+
+defun: cs_convexHull_xy(list $pList)
+@{
+	$xCoordinateList << loop
+	{
+		for $p in $pList;
+		for $x is nx_X($p);
+		collect $x;
+	};
+	
+	$rightMostP << nth(position(maxList($xCoordinateList), $xCoordinateList), $pList);
+	
+	$hullPoints << cs_covexHullRecursion_xy($pList, $rightMostP, $rightMostP, {$rightMostP});
+	
+	#+
+	$drawHull << loop
+	{
+		for $i from 1 to (length($hullPoints) - 1);
+		for $pFrom is nth($i, $hullPoints);
+		for $pTo is nth($i+1, $hullPoints);
+		do ug_createInstance({
+								class, ug_line;
+								start_point, $pFrom;
+								end_point, $pTo;
+							});
+		collect 0;
+	};
+	#-
+	
+	$hullPoints;
+	
+} list;
+
+
+defun: cs_covexHullRecursion_xy(list $pList, point $thisP, point $previousP, list $hullPoints)
+@{
+	$vToPrevious << if ($thisP == $previousP) 
+						then (vector(1,0,0)) 
+						else (unitVector2Points($thisP, $previousP));
+	
+	$pListForSearch << setDifference($pList, {$previousP, $thisP});
+	
+	$angleCCWToAllPoints << loop
+	{
+		for $p in $pListForSearch;
+		for $v is unitVector2Points($thisP, $p);
+		for $angleCCW is angle2Vectors($vToPrevious, $v, vector(0,0,1));
+		collect $angleCCW;
+	};
+	
+	$nextP << nth(position(minList($angleCCWToAllPoints), $angleCCWToAllPoints), $pListForSearch);
+	
+	##+
+	$hull << ug_createInstance({
+									class, ug_line;
+									start_point, $thisP;
+									end_point, $nextP;
+								});
+	#-
+	
+	$hullPointsForNextRound << flatten({$hullPoints, $nextP});
+	
+	if ($nextP == first($hullPoints)) 
+		then ($hullPointsForNextRound)
+		else cs_covexHullRecursion_xy($pList, $nextP, $thisP, $hullPointsForNextRound);
+	
+} list;
+
+#==============================================================================
+# Function		alignToGrid
+# returns a point on a grid that is closest to the input point
+#==============================================================================
+
+defun: alignToGrid(point $p, integer $gridsize)
+@{
+	$x << localX($p);
+	$y << localY($p);
+	
+	$xRounded << (round($x / $gridsize) * $gridsize);
+	$yRounded << (round($y / $gridsize) * $gridsize);
+	
+	point($xRounded, $yRounded, 0);
+} point;
+
+#==============================================================================
+# Function		localXY_
+# returns the x or y coordinate of a point with respect to a 2D-frame passed.
+# works only for frames whose XY plane is parallel to the global XY plane.
+#==============================================================================
+
+defun: localXY_(point $p, frame $frame, string $xy)
+@{
+
+	$frm_origin << point_(0,0,0, $frame);
+	
+	$dist2p_2d << dist(point(localX($frm_origin) , localY($frm_origin) , 0) , point(localX($p) , localY($p) , 0));
+	
+	$vec2p << unitVector2Points(point(localX($frm_origin) , localY($frm_origin) , 0) , point(localX($p) , localY($p) , 0));
+	
+	$frame_x << unitize(vector_(1,0,0, $frame));
+	
+	$theta << angle2Vectors($frame_x , $vec2p , vector(0,0,1));
+	
+	$x << $dist2p_2d * cos($theta);
+	$y << $dist2p_2d * sin($theta);
+	
+	$result << if ($xy == "x") then ($x) 
+							else if ($xy == "y") then ($y)
+							else ug_printMessage({"Invalid value passed to the third argument in localXY_()."});
+
+
+} number;
+
+
+#==============================================================================
+# Function		emptyStrings(integer n)
+# returns a list containing n empty strings, "".
+#==============================================================================
+
+defun: emptyStrings(integer $n)
+@{
+		loop
+		{
+			for $i from 1 to $n;
+			collect "";
+		};
+} list;
+
+
+

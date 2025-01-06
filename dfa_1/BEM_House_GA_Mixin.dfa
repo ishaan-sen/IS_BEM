@@ -1,0 +1,261 @@
+#! NX/KF 9.0
+
+DefClass: BEM_House_GA_Mixin (ug_base_part %ug_create_instance);
+
+#====================================================
+# Class for operating the GA on the BEM_House.
+# This is an abstract class and cannot be instantiated directly.
+# It can only be used as a mixin to the BEM_House class.
+#====================================================
+
+
+
+
+
+#==========================================================================
+# GA Code Below...
+#==========================================================================
+
+(list modifiable) chromosome_geometry: 
+{		
+	# house parameters
+	x_angle: , height: , roof_height: ,
+
+	# room aspect ratios
+	aspect_family_room: , aspect_master_bedroom: , 
+	aspect_master_bathroom: , aspect_living_room: , 
+	aspect_patio: , aspect_guest_bathroom: ,
+	aspect_guest_bedroom: , aspect_kids_bathroom: ,
+	aspect_kids_bedroom: ,
+
+	# window indices
+	window_inx_family_room: , window_inx_master_bedroom: ,
+	window_inx_master_bathroom: , window_inx_living_room: ,
+	window_inx_patio: , window_inx_guest_bathroom: ,
+	window_inx_guest_bedroom: , window_inx_kids_bathroom: ,
+	window_inx_kids_bedroom: ,
+
+	# window areas
+	window_area_family_room: , window_area_master_bedroom: ,
+	window_area_master_bathroom: , window_area_living_room: ,
+	window_area_patio: , window_area_guest_bathroom: ,
+	window_area_guest_bedroom: , window_area_kids_bathroom: ,
+	window_area_kids_bedroom:
+};
+
+#+
+(list modifiable) GA_chromosome:
+{
+	{orientation:, wall_ht:, roof_ht:},
+	{room_aspect_ratios:},
+	{window_indices:},
+	{window_areas:}
+};
+#-
+
+
+(list modifiable) chromosome_material: {		
+																	
+																					# thermal properties of materials
+																					alpha_s_window: , alpha_s_wall_gable: , alpha_s_roof: ,
+																					alpha_sky_window: , alpha_sky_wall_gable: , alpha_sky_roof: ,
+																					tau_s_window: , tau_s_wall_gable: , tau_s_roof: ,
+																					tau_sky_window: , tau_sky_wall_gable: , tau_sky_roof: ,
+																					kappa_window: , kappa_wall_gable: , kappa_roof: ,
+																					L_window: , L_wall_gable: , L_roof: 
+																	
+																			};
+
+(list modifiable) mutations_all_together: flatten({0,0,0, loop {for $i from 4 to 30; collect 1;}});	
+(list modifiable) mutations_orientation: flatten({1, loop {for $i from 2 to 30; collect 0;}});	
+(list modifiable) mutations_windows: flatten({0,0,0,0,0,0,0,0,0,0,0,0, loop {for $i from 13 to 30; collect 1;}});
+(list modifiable) mutations_aspect: flatten({0,0,0,1,1,1,1,1,1,1,1,1, loop {for $i from 13 to 30; collect 0;}});
+																			
+
+
+(list modifiable) children_from_ga: {};
+
+
+(boolean method modifiable) get_generation_from_excel:(any $port , list $mutations , list $chromosome)
+@{
+	
+	# ug_printMessage({"1"});
+	
+	ug_printValues({"~n~nGetting generations from Excel."});
+	
+	ug_excel_write_range($port, flatten({1 , 4 , 3 , 33 , 3 , $mutations}));	# mutation choices written to Excel
+	
+	ug_excel_write_range($port, flatten({1 , 4 , 4 , 33 , 4 , $chromosome}));	# chromosome data written to Excel
+	
+	# ug_printMessage({"2"});
+	
+	$all_children << loop
+	{
+			for $i from 1 to num_children_per_generations:;	
+			for $data is ug_excel_read_range($port , 1 , 4 , ($i + 8) , 33 , ($i + 8));		# row range 4-33, column range 9-23
+			collect $data;	
+	};
+	
+	# ug_printMessage({"3"});
+	
+	# ug_printValues($all_children);
+		
+	$all_children_formatted << loop
+	{
+		for $child in $all_children;
+		
+		for $child_formatted is loop
+			{
+				for $i from 6 to length($child);
+				
+				for $data_as_string is nth($i, $child);
+				
+				for $data_as_num is makeNumber($data_as_string);
+				
+				for $data_formatted is if (($i >= 18) && ($i <= 26)) then ($data_as_num) else ($data_as_num + 0.000000001);
+				
+				collect ($data_formatted);
+			};
+			
+		collect $child_formatted;
+	};
+	
+	# ug_printValues($all_children_formatted);
+	
+	storeValue($all_children_formatted , self: , children_from_ga);
+	
+	ug_printValues({"Obtained generation. # of Children = " + format("%d" , length(children_from_ga:))});
+	
+	ug_printValues({"children_from_ga: = ", children_from_ga:});
+	
+	true;
+
+};
+
+
+
+
+(list modifiable) fitness_data: {};
+
+
+(boolean method modifiable) evaluate_children:(integer $gen_inx)
+@{
+
+	storeValue({} , self: , fitness_data);
+	
+	loop
+	{
+	
+		for $child_inx from 1 to length(children_from_ga:);
+		for $child_data in children_from_ga:;
+		
+		do storeValue($child_inx , self: , child_id);
+		
+		# do ug_printValue($child_data);
+		
+		# write variables of the child chromosome into the building parameters
+		
+		do copy_chromosome_to_variables:($child_data);
+		
+		# update the building geometry
+		
+		do create_rooms_without_calling_city_data:();
+		do UI_create_roof:;
+		
+		do ug_updateKFObjects({});
+		
+		# calculate heat load
+		
+		do get_heat_load_total:($gen_inx , $child_inx);
+		
+		do storeValue((fitness_data: + {heat_load_total:}) , self: , fitness_data);
+		
+		
+		for $demand_fitness is if ($child_inx == length(children_from_ga:)) 
+															then ug_printValues({"~nFitness values of this generation: " , fitness_data:})
+															else fitness_data:;
+		#+#-
+		
+		collect 0;
+	
+	};
+	
+	true;
+
+};
+
+
+
+(integer modifiable) child_id: 0;
+
+
+
+(boolean method modifiable) promote_fittest_child:()
+@{
+
+	$fittest_child_index << position(minlist(fitness_data:) , fitness_data:);
+	
+	ug_printValues({"~nMinimum heat load of this generation = " , format("%d" , minlist(fitness_data:)) , " Watts, found in child index: " , format("%d" , $fittest_child_index) , "."});
+	
+	$fittest_chromosome << nth($fittest_child_index , children_from_ga:);
+	
+	storeValue($fittest_chromosome , self: , chromosome_geometry);
+	
+	copy_chromosome_to_variables:(chromosome_geometry:);
+	
+	ug_updateKFObjects({});
+	
+	ug_printValues({"Fittest child promoted.  Geometry updated.~n~n"});
+	
+	storeValue((fittest_heatloads_list: + {minlist(fitness_data:)}) , self: , fittest_heatloads_list);  
+
+	true;
+
+}; 
+
+
+(list modifiable) fittest_heatloads_list: {};
+
+
+
+
+(boolean method modifiable) copy_chromosome_to_variables:(list $chrom)
+@{
+
+	storeValue(nth(1 , $chrom) , self:, x_angle);
+	storeValue(nth(2 , $chrom) , self:, height);
+	storeValue(nth(3 , $chrom) , self:, roof_height);
+
+	storeValue(nth(4 , $chrom) , self:, aspect_family_room);
+	storeValue(nth(5 , $chrom) , self:, aspect_master_bedroom);
+	storeValue(nth(6 , $chrom) , self:, aspect_master_bathroom);
+	storeValue(nth(7 , $chrom) , self:, aspect_living_room);
+	storeValue(nth(8 , $chrom) , self:, aspect_patio);
+	storeValue(nth(9 , $chrom) , self:, aspect_guest_bathroom);
+	storeValue(nth(10 , $chrom) , self:, aspect_guest_bedroom);
+	storeValue(nth(11 , $chrom) , self:, aspect_kids_bathroom);
+	storeValue(nth(12 , $chrom) , self:, aspect_kids_bedroom);
+
+	storeValue(nth(13 , $chrom) , self: , window_inx_family_room);
+	storeValue(nth(14 , $chrom) , self: , window_inx_master_bedroom);
+	storeValue(nth(15 , $chrom) , self: , window_inx_master_bathroom);
+	storeValue(nth(16 , $chrom) , self: , window_inx_living_room);
+	storeValue(nth(17 , $chrom) , self: , window_inx_patio);
+	storeValue(nth(18 , $chrom) , self: , window_inx_guest_bathroom);
+	storeValue(nth(19 , $chrom) , self: , window_inx_guest_bedroom);
+	storeValue(nth(20 , $chrom) , self: , window_inx_kids_bathroom);
+	storeValue(nth(21 , $chrom) , self: , window_inx_kids_bedroom);
+
+	storeValue(nth(22 , $chrom) , self: , window_area_family_room);
+	storeValue(nth(23 , $chrom) , self: , window_area_master_bedroom);
+	storeValue(nth(24 , $chrom) , self: , window_area_master_bathroom);
+	storeValue(nth(25 , $chrom) , self: , window_area_living_room);
+	storeValue(nth(26 , $chrom) , self: , window_area_patio);
+	storeValue(nth(27 , $chrom) , self: , window_area_guest_bathroom);
+	storeValue(nth(28 , $chrom) , self: , window_area_guest_bedroom);
+	storeValue(nth(29 , $chrom) , self: , window_area_kids_bathroom);
+	storeValue(nth(30 , $chrom) , self: , window_area_kids_bedroom);
+
+};
+
+

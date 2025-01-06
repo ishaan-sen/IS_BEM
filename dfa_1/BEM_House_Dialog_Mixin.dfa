@@ -1,0 +1,348 @@
+#! NX/KF 9.0
+
+DefClass: BEM_House_Dialog_Mixin (ug_base_part %ug_create_instance);
+
+#====================================================
+# Class for the dialog objects for the class BEM_House.
+# This is an abstract class and cannot be instantiated directly.
+# It can only be used as a mixin to the BEM_House class.
+#====================================================
+
+
+#===============================
+# Dialog objects for the location (city, etc.)
+#===============================
+
+(integer parameter modifiable) city: 2;
+
+(list parameter modifiable) city_LIST: 
+{
+	# northern hemisphere
+	"Anchorage, AK (61.2181)", "Seattle, WA (47.6062)", 
+	"Washington, DC (38.9072)", "Melbourne, FL (28.0836)", 
+	"Mexico City, Mexico (19.4326)", "Panama City, Panama (8.9824)", 
+	"Singapore (1.3521)",
+	
+	# southern hemisphere
+	"Nairobi, Kenya (-1.2921)", "Lima, Peru (-12.0464)", "Rio De Janeiro, Brazil (-22.9068)", 
+	"Cape Town, South Africa (-33.9249)", "Melbourne, Australia (-37.8136)";
+
+};
+
+(string parameter modifiable) city_data_FILE: getEnv("BEM_BASE_DIR") + "\Database\city_data.xlsx";
+
+
+
+(number parameter modifiable) x_angle: 180; # nth(front_direction: , {90 , 180 , 270 , 0});
+
+# (integer parameter modifiable) front_direction: 2;
+# (list parameter modifiable) front_direction_LIST: {"East", "North", "West", "South"}; 
+# (integer parameter modifiable) keep_dir_fixed: 1;
+
+(integer parameter modifiable) solstice: 1;
+(list parameter modifiable) solstice_LIST: {"June 21", "December 21"};
+
+
+
+#===============================
+# Dialog objects for the house 
+#===============================
+
+(number parameter modifiable) height: 3;					# m, wall height ground to bottom of roof
+
+(number parameter modifiable) roof_height: 4.5;		# m, from top of wall to top of roof
+
+(number parameter modifiable) T_i: 295;
+
+#===============================
+# Dialog objects for the rooms 
+#===============================
+
+(number modifiable) room_aspect_default: 1.5;
+(number modifiable modifiable) window_area_default: 1; 
+(number modifiable modifiable) window_aspect_default: 2/3; 
+
+(number parameter modifiable) area_family_room: 8 * 8;
+(number parameter modifiable) aspect_family_room: room_aspect_default:;
+(integer parameter modifiable) window_inx_family_room: 3;
+(number modifiable) window_area_family_room: window_area_default:;
+(number modifiable) window_aspect_family_room: window_aspect_default:;
+
+(number parameter modifiable) area_master_bedroom: 6 * 6;
+(number parameter modifiable) aspect_master_bedroom: room_aspect_default:;
+(integer parameter modifiable) window_inx_master_bedroom: 4;
+(number modifiable) window_area_master_bedroom: window_area_default:;
+(number modifiable) window_aspect_master_bedroom: window_aspect_default:;
+
+(number parameter modifiable) area_master_bathroom: 4 * 4;
+(number parameter modifiable) aspect_master_bathroom: room_aspect_default:;
+(integer parameter modifiable) window_inx_master_bathroom: 1;
+(number modifiable) window_area_master_bathroom: window_area_default:;
+(number modifiable) window_aspect_master_bathroom: window_aspect_default:;
+
+(number parameter modifiable) area_living_room: 6 * 6;
+(number parameter modifiable) aspect_living_room: room_aspect_default:;
+(integer parameter modifiable) window_inx_living_room: 1;
+(number modifiable) window_area_living_room: window_area_default:;
+(number modifiable) window_aspect_living_room: window_aspect_default:;
+
+(number parameter modifiable) area_patio: 4 * 3;
+(number parameter modifiable) aspect_patio: room_aspect_default:;
+(integer parameter modifiable) window_inx_patio: 3;
+(number modifiable) window_area_patio: window_area_default:;
+(number modifiable) window_aspect_patio: window_aspect_default:;
+
+(number parameter modifiable) area_guest_bathroom: 4 * 2.5;
+(number parameter modifiable) aspect_guest_bathroom: room_aspect_default:;
+(integer parameter modifiable) window_inx_guest_bathroom: 0;
+(number modifiable) window_area_guest_bathroom: window_area_default:;
+(number modifiable) window_aspect_guest_bathroom: window_aspect_default:;
+
+(number parameter modifiable) area_guest_bedroom: 24;
+(number parameter modifiable) aspect_guest_bedroom: room_aspect_default:;
+(integer parameter modifiable) window_inx_guest_bedroom: 2;
+(number modifiable) window_area_guest_bedroom: window_area_default:;
+(number modifiable) window_aspect_guest_bedroom: window_aspect_default:;
+
+(number parameter modifiable) area_kids_bathroom: 10;
+(number parameter modifiable) aspect_kids_bathroom: room_aspect_default:;
+(integer parameter modifiable) window_inx_kids_bathroom: 0;
+(number modifiable) window_area_kids_bathroom: window_area_default:;
+(number modifiable) window_aspect_kids_bathroom: window_aspect_default:;
+
+(number parameter modifiable) area_kids_bedroom: 24;
+(number parameter modifiable) aspect_kids_bedroom: room_aspect_default:;
+(integer parameter modifiable) window_inx_kids_bedroom: 2;
+(number modifiable) window_area_kids_bedroom: window_area_default:;
+(number modifiable) window_aspect_kids_bedroom: window_aspect_default:;
+
+
+#===============================
+# This block allows importing a chromosome through the dialog and 
+# updating the house to that chromosome.
+
+(string parameter modifiable) input_chromosome_string: "";
+
+(boolean parameter modifiable) build_house_from_chromosome:
+@{
+
+	$chrom_str_list << splitString(input_chromosome_string: , "{,}");
+	
+	# ug_printValues({$chrom_str_list});
+	
+	$chrom_num_list << loop
+	{
+		for $str in $chrom_str_list;
+		collect(makeNumber($str));	
+	};
+	
+	# ug_printValues({$chrom_num_list});
+
+	copy_chromosome_to_variables:($chrom_num_list);
+	
+	# UI_create_rooms:;
+	
+	# UI_create_roof:;
+	
+	true;
+
+};
+
+
+
+
+#===============================
+# Dialog objects for creating the house in two steps.
+# First creat the rooms, then the roof.
+# The roof call forces updates on the Boolean 
+# needed to determine the external edges of the house
+# that are used to create the roof slopes.
+#===============================
+
+
+(boolean parameter modifiable) UI_create_rooms: 
+@{
+
+	create_rooms_without_calling_city_data:()	;
+	get_city_data:();	
+	
+	storeValue(1, self:, UI_create_roof_SENS);
+
+	
+	true;
+
+};
+
+(boolean method modifiable) create_rooms_without_calling_city_data:() 
+@{
+
+	storeValue(false , self: , flag_spine);
+	storeValue(false , self: , flag_roof);
+	ug_updateKFObjects({});
+	
+	true;
+
+};
+
+
+
+(boolean uncached parameter modifiable) UI_create_roof: 
+@{
+	
+	roof_edges:;
+	spine_points_x:;
+	
+	storeValue(true , self: , flag_spine);	
+	ug_updateKFObjects({});
+	
+	roof_slopes_data:;
+	
+	storeValue(true , self: , flag_roof);	
+	ug_updateKFObjects({});
+
+	storeValue(1, self:, run_ga_geometry_SENS);
+	storeValue(1, self:, evaluate_current_house_SENS);
+
+	
+	true;
+
+};
+
+
+(integer modifiable) UI_create_roof_SENS: 0;
+
+
+(boolean modifiable) evaluate_current_house:
+@{
+		ug_printValues({"Current House~n============="});
+		get_heat_load_total:(gen_id: , child_id:);
+		true;
+};
+
+(integer modifiable) evaluate_current_house_SENS: 0;
+
+
+
+
+
+#===============================
+# Dialog parameters for the GA
+#===============================
+
+(string parameter modifiable) ga_program_geometry_FILE: getEnv("BEM_BASE_DIR") + "\Application\GA_Geometry.xlsx";
+
+(string parameter modifiable) ga_program_geometry_FILE_message: shortenFilePathString(ga_program_geometry_FILE: , 3);
+
+(integer parameter modifiable) open_excel_file_geometry: system(ga_program_geometry_FILE:);		# provides edit access to the Excel GA file directly from NX dialog
+
+(integer modifiable) open_excel_file_geometry_SENS: if (ga_program_geometry_FILE: != "") then (1) else (0);
+
+
+
+(string parameter modifiable) ga_program_material_FILE: getEnv("BEM_BASE_DIR") + "\Application\GA_Materials.xlsx";
+
+(string parameter modifiable) ga_program_material_FILE_message: shortenFilePathString(ga_program_material_FILE: , 3);
+
+(integer parameter modifiable) open_excel_file_material: system(ga_program_material_FILE:);		# provides edit access to the Excel GA file directly from NX dialog
+
+(integer modifiable) open_excel_file_material_SENS: if (ga_program_material_FILE: != "") then (1) else (0);
+
+
+(string parameter modifiable) ga_output_FILE: getEnv("BEM_BASE_DIR") + "\Output\GA_Output.xlsx";
+
+
+
+(integer parameter modifiable) mutation_option: 1;
+
+(integer parameter modifiable) num_generations_alltogether: 5;
+(integer parameter modifiable) num_generations_orientation: 5;
+(integer parameter modifiable) num_generations_windows: 5;
+(integer parameter modifiable) num_generations_aspect: 5;
+
+(integer modifiable) num_generations_alltogether_SENS: if (mutation_option: == 1) then 1 else 0;
+(integer modifiable) num_generations_orientation_SENS: abs( num_generations_alltogether_SENS: - 1);
+(integer modifiable) num_generations_windows_SENS: abs( num_generations_alltogether_SENS: - 1);
+(integer modifiable) num_generations_aspect_SENS: abs( num_generations_alltogether_SENS: - 1);
+
+(integer parameter modifiable) num_children_per_generations: 5;
+
+
+
+(integer modifiable) run_ga_geometry_SENS: 0;
+
+(boolean parameter modifiable) run_ga_geometry:
+@{
+
+	evaluate_current_house:;
+
+	storeValue({heat_load_total:} , self: , fittest_heatloads_list);		# House # 0.0, given model to GA
+	
+	$port << ug_excel_open_file(ga_program_geometry_FILE:, write);
+	
+	$looplengths << if (mutation_option: == 1) 
+										then {num_generations_alltogether:} 
+										else {num_generations_orientation: , num_generations_windows: , num_generations_aspect:};
+										
+	$mutation_options << if (mutation_option: == 1) 
+										then {mutations_all_together:} 
+										else {mutations_orientation: , mutations_windows: , mutations_aspect:};
+	
+
+	# This is the GA loop
+	if ($port == 0) then (ug_printMessage({"Failed to open the GA Excel file (Geometry) with write access."})) else
+	
+	loop
+	{
+			for $i from 1 to length($looplengths);
+			do loop
+			{
+				for $gen_inx from 1 to nth($i , $looplengths);
+				do storeValue((gen_id: + 1) , self: , gen_id);
+				do ug_printValues({"~n~nGeneration # " + format("%d" , gen_id:) + ".~n---------------"});
+				do get_generation_from_excel:($port , nth($i , $mutation_options) , chromosome_geometry:);
+				do evaluate_children:(gen_id:);
+				do promote_fittest_child:();
+				do ug_updateKFObjects({});
+				collect 0;
+			};
+			collect 0;
+	};
+
+	ug_excel_close_file($port, true);	# keep this true, so that the chromosome is saved for continued runs
+	
+	ug_updateKFObjects({});
+	
+	ug_printMessage({"The genetic algorithm completed."});
+	
+	
+	# Write the results into the GA_Output.xlsx file
+	
+	$port2 << ug_excel_open_file(ga_output_FILE:, write);
+	
+	if ($port2 == 0) then (ug_printMessage({"Failed to open the GA Output file with write access."})) 
+		else 
+		@{
+				ug_excel_write_range($port2, flatten({1, 5, 4, 104 , 4 , emptyStrings(100)}));
+				
+				ug_excel_write_range($port2, flatten({1, 5, 4, (5 + length(fittest_heatloads_list:) - 1) , 4 , fittest_heatloads_list:}));
+		};
+
+	ug_excel_close_file($port2, true);	# true will save the output data into the file
+	
+	
+	true;
+
+};
+
+(integer modifiable) gen_id: 0;
+
+
+(boolean parameter modifiable) run_ga_material:
+@{
+
+	
+	true;
+
+};
+
+(integer modifiable) run_ga_material_SENS: 0;

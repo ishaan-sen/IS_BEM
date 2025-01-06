@@ -1,0 +1,74 @@
+
+
+(list modifiable) roof_vectors: 
+@{
+
+	roof_edges:;
+	
+	$ceiling_top_face << 
+	@{
+		$all_faces << ug_body_askFaces(family_room:solid_room:);
+		loop
+		{
+			for $face in $all_faces;
+			if (ug_face_askNormal($face, {0,0}) == vector(0,0,1)) return $face;
+		};
+	};
+	
+	
+	$face_params << ug_face_askParameterRange($ceiling_top_face);
+	
+	$face_center << ug_face_askPointOnFace($ceiling_top_face, 
+										{(first($face_params) + second($face_params)) / 2, 
+												(third($face_params) + fourth($face_params)) / 2} );
+
+
+	loop
+	{
+		
+		for $edge in roof_edges:;
+		
+		for $stP is ug_curve_askStartPoint($edge);
+		for $enP is ug_curve_askEndPoint($edge);
+		
+		for $edge_vec is unitVector2Points($stP, $enP);
+		
+		for $ref_vec is unitVector2Points($stP , $face_center);
+		
+		for $vec_angle is angle2Vectors($ref_vec , $edge_vec , vector(0,0,1));
+		
+		for $vec_rot_factor is if ($vec_angle <= 180) then (-1) else (1);
+		
+		for $rotated_vec is rotateVector($edge_vec , 90 , vector(0,0, $vec_rot_factor));
+		
+		for $inclined_vec is rotateVector($rotated_vec , roof_angle: , $vec_rot_factor * $edge_vec);
+
+		collect $inclined_vec;
+
+	};
+	
+};
+
+
+
+(child list) roof_slopes:
+{
+
+	class, if (flag_roof: == false) then nullDesign else ug_extruded;
+	quantity, if (flag_roof: == true) then length(roof_edges:) else 1;
+	profile, {nth(child:index: , roof_edges:)};
+	start_limit, 0;
+	end_limit, 1;
+	direction, nth(child:index: , roof_vectors:);
+	# demandOrder, if (flag_roof: == true) then {body_united_rooms:} else {};
+	suppress?, false;
+};
+
+
+
+(child) roofslope_1:
+{
+	class, if (flag_roof: == true) then ug_extruded else nullDesign;
+	direction, unitize(vector(first(spine_points_x:)-localX(ug_curve_askEndPoint(nth(roof_edges: , 5))),first(spine_points_x:)-localY(ug_curve_askEndPoint(nth(roof_edges:)),first(spine_points_x:)-localZ(ug_curve_askEndPoint(nth(roof_edges:))))))
+}
+
